@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>ダイアトニックコード進行ゲーム（iPhone対応）</title>
+</head>
+<body>
+<h2>ダイアトニックコード進行ゲーム（Cメジャー・ギター風・iPhone対応）</h2>
+<p>「再生」ボタンで4つのコードが順番に鳴ります。答えは非表示なので、自分で進行を当ててください。</p>
+
+<button onclick="playRandomProgression()">新しい進行を再生</button>
+<button onclick="showAnswer()" id="showAnswerBtn" disabled>答えを見る</button>
+
+<h3>過去の進行（復習用）</h3>
+<ul id="history"></ul>
+
+<p id="result" style="font-weight:bold;">答えは非表示です。自分で当ててください。</p>
+
+<script>
+const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+const chords = [
+  {name: "I (Cメジャー)", notes: [60, 64, 67]},
+  {name: "II (Dマイナー)", notes: [62, 65, 69]},
+  {name: "III (Eマイナー)", notes: [64, 67, 71]},
+  {name: "IV (Fメジャー)", notes: [65, 69, 72]},
+  {name: "V (Gメジャー)", notes: [67, 71, 74]},
+  {name: "VI (Aマイナー)", notes: [69, 72, 76]},
+  {name: "VII (Bディミニッシュ)", notes: [71, 74, 77]}
+];
+
+let lastProgression = [];
+let history = [];
+
+function midiToFreq(midi) {
+  return 440 * Math.pow(2, (midi - 69)/12);
+}
+
+// iOS対応：AudioContextがサスペンド状態なら再開
+function ensureAudioContext() {
+  if (AudioCtx.state === 'suspended') {
+    AudioCtx.resume();
+  }
+}
+
+// ギター風ストロークで鳴らす
+function playChord(notes, startTime=0) {
+  notes.forEach((n, i) => {
+    const osc = AudioCtx.createOscillator();
+    const gainNode = AudioCtx.createGain();
+    osc.connect(gainNode);
+    gainNode.connect(AudioCtx.destination);
+    osc.type = "triangle"; // ギター風
+    osc.frequency.value = midiToFreq(n);
+    gainNode.gain.value = 0.15;
+    osc.start(AudioCtx.currentTime + startTime + i*0.05);
+    osc.stop(AudioCtx.currentTime + startTime + 0.6);
+  });
+}
+
+function playProgression(progression) {
+  ensureAudioContext(); // iOS対応
+  progression.forEach((chord, index) => {
+    playChord(chord.notes, index); // 1秒間隔でコード再生
+  });
+}
+
+function playRandomProgression() {
+  ensureAudioContext(); // iOS対応
+  lastProgression = [];
+  for(let i=0; i<4; i++){
+    lastProgression.push(chords[Math.floor(Math.random() * chords.length)]);
+  }
+
+  playProgression(lastProgression);
+
+  document.getElementById("result").textContent = "答えは非表示です。自分で当ててください。";
+  document.getElementById("showAnswerBtn").disabled = false;
+
+  history.push(lastProgression);
+  updateHistory();
+}
+
+function showAnswer() {
+  if(lastProgression.length > 0){
+    document.getElementById("result").textContent = "答え: " + lastProgression.map(c => c.name).join(" → ");
+    document.getElementById("showAnswerBtn").disabled = true;
+  }
+}
+
+function updateHistory() {
+  const ul = document.getElementById("history");
+  ul.innerHTML = "";
+  history.slice().reverse().forEach((prog, idx) => {
+    const li = document.createElement("li");
+    const btn = document.createElement("button");
+    btn.textContent = "再生";
+    btn.onclick = () => playProgression(prog);
+    li.textContent = "進行 " + (history.length - idx) + " ";
+    li.appendChild(btn);
+    ul.appendChild(li);
+  });
+}
+</script>
+</body>
+</html>
